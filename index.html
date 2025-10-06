@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>スマートディスプレイ</title>
+  <style>
+    body {
+      margin: 0;
+      background-color: #111;
+      color: #fff;
+      font-family: 'Courier New', monospace;
+      overflow: hidden;
+    }
+    #date {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 2em;
+    }
+    #time {
+      position: absolute;
+      top: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 3em;
+      animation: fade 2s infinite;
+    }
+    #weather-local {
+      position: absolute;
+      top: 120px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 1.2em;
+      white-space: pre-line;
+      text-align: center;
+    }
+    #weather-week {
+      position: absolute;
+      top: 200px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 1em;
+      white-space: nowrap;
+      overflow-x: auto;
+      max-width: 90%;
+      display: flex;
+      gap: 40px;
+      scroll-behavior: smooth;
+    }
+    .weather-item {
+      flex: 0 0 auto;
+    }
+    #player {
+      display: flex;
+      justify-content: center;
+      margin-top: 260px;
+    }
+    #volumeControl {
+      position: absolute;
+      bottom: 140px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #fff;
+      font-size: 0.9em;
+      text-align: center;
+    }
+    #volumeSlider {
+      width: 300px;
+    }
+    .bottom-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: center;
+      background-color: #222;
+      padding: 10px 20px;
+    }
+    .shortcut-bar {
+      display: flex;
+      gap: 16px;
+    }
+    .shortcut-bar a img {
+      width: 50px;
+      height: 50px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    @keyframes fade {
+      0%   { opacity: 1; }
+      50%  { opacity: 0.4; }
+      100% { opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="date"></div>
+  <div id="time"></div>
+  <div id="weather-local">現在地の天気取得中...</div>
+  <div id="weather-week">週間天気取得中...</div>
+  <div id="player"></div>
+
+  <div id="volumeControl">
+    音量調整：<input type="range" min="0" max="100" value="0" id="volumeSlider">
+  </div>
+
+  <div class="bottom-bar">
+    <div class="shortcut-bar">
+      <a href="https://mail.google.com" target="_blank">
+        <img src="https://www.gstatic.com/images/icons/material/system/2x/mail_black_48dp.png" alt="Mail">
+      </a>
+      <a href="https://calendar.google.com" target="_blank">
+        <img src="https://www.gstatic.com/images/icons/material/system/2x/event_black_48dp.png" alt="Calendar">
+      </a>
+      <a href="https://www.youtube.com/?gl=JP&hl=ja" target="_blank">
+        <img src="https://www.youtube.com/s/desktop/fe2e3b1e/img/favicon_144x144.png" alt="YouTube">
+      </a>
+      <a href="https://tver.jp/" target="_blank">
+        <img src="https://tver.jp/images/common/tver-logo.png" alt="TVer">
+      </a>
+      <a href="https://abema.tv/" target="_blank">
+        <img src="https://abema.tv/assets/images/favicon/android-icon-192x192.png" alt="ABEMA">
+      </a>
+    </div>
+  </div>
+  <script>
+    function updateClock() {
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const hh = String(now.getHours()).padStart(2, '0');
+      const min = String(now.getMinutes()).padStart(2, '0');
+      const ss = String(now.getSeconds()).padStart(2, '0');
+      const weekdays = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+      const dayLabel = weekdays[now.getDay()];
+      document.getElementById("date").textContent = `${yyyy}.${mm}.${dd} ${dayLabel}`;
+      document.getElementById("time").textContent = `${hh}:${min}:${ss}`;
+    }
+
+    function getWeatherInfo(code) {
+      const map = {
+        0: { text: "快晴", emoji: "☀️" },
+        1: { text: "晴れ", emoji: "☀️" },
+        2: { text: "薄曇り", emoji: "🌤️" },
+        3: { text: "曇り", emoji: "☁️" },
+        45: { text: "霧", emoji: "🌫️" },
+        48: { text: "霧（霧雨）", emoji: "🌫️" },
+        51: { text: "弱い霧雨", emoji: "🌦️" },
+        53: { text: "中程度の霧雨", emoji: "🌦️" },
+        55: { text: "強い霧雨", emoji: "🌦️" },
+        61: { text: "弱い雨", emoji: "🌧️" },
+        63: { text: "中程度の雨", emoji: "🌧️" },
+        65: { text: "強い雨", emoji: "🌧️" },
+        80: { text: "にわか雨", emoji: "🌦️" },
+        95: { text: "雷雨", emoji: "⛈️" },
+        99: { text: "激しい雷雨", emoji: "⛈️" }
+      };
+      return map[code] || { text: "不明", emoji: "❓" };
+    }
+
+    function fetchCityName(lat, lon) {
+      const apiKey = "548193a00baa409288c52311e46b17af";
+      const url = `https://api.opencagedata.com/geocode/v1/json?q=${lat}+${lon}&key=${apiKey}&language=ja`;
+      return fetch(url)
+        .then(res => res.json())
+        .then(data => {
+          const comp = data.results[0].components;
+          return comp.city || comp.town || comp.village || "不明な場所";
+        });
+    }
+
+    function fetchWeatherLocalAndWeek() {
+      if (!navigator.geolocation) {
+        document.getElementById("weather-local").textContent = "位置情報が利用できません";
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const lat = position.coords.latitude;
+          const lon = position.coords.longitude;
+          const weatherURL = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=Asia%2FTokyo`;
+          Promise.all([
+            fetch(weatherURL).then(res => res.json()),
+            fetchCityName(lat, lon)
+          ])
+          .then(([weatherData, cityName]) => {
+            const todayCode = weatherData.daily.weathercode[0];
+            const todayMax = weatherData.daily.temperature_2m_max[0];
+            const todayMin = weatherData.daily.temperature_2m_min[0];
+            const todayInfo = getWeatherInfo(todayCode);
+            document.getElementById("weather-local").textContent =
+              `現在地：${cityName}\n今日の天気：${todayInfo.text} ${todayInfo.emoji}\n気温：${todayMax}℃ / ${todayMin}℃`;
+
+            const weekHTML = weatherData.daily.time.map((date, i) => {
+              const code = weatherData.daily.weathercode[i];
+              const max = weatherData.daily.temperature_2m_max[i];
+              const min = weatherData.daily.temperature_2m_min[i];
+                           const info = getWeatherInfo(code);
+              const label = new Date(date).toLocaleDateString("ja-JP", { weekday: "short" });
+              return `<div class="weather-item">${label}<br>${info.emoji}<br>${max}℃ / ${min}℃</div>`;
+            }).join("");
+            document.getElementById("weather-week").innerHTML = weekHTML;
+          })
+          .catch(() => {
+            document.getElementById("weather-local").textContent = "天気取得失敗";
+            document.getElementById("weather-week").textContent = "週間天気取得失敗";
+          });
+        },
+        () => {
+          document.getElementById("weather-local").textContent = "位置情報の取得に失敗しました";
+        }
+      );
+    }
+
+    const playlistId = 'PLKeSkVQhqoOpj9M8ic2i0E_yo0HTb6ij7';
+    let player;
+    let tag = document.createElement('script');
+    tag.src = "https://www.youtube.com/iframe_api";
+    document.body.appendChild(tag);
+
+    function onYouTubeIframeAPIReady() {
+      player = new YT.Player('player', {
+        height: '360',
+        width: '640',
+        playerVars: {
+          autoplay: 1,
+          controls: 0,
+          mute: 1,
+          loop: 1,
+          listType: 'playlist',
+          list: playlistId
+        },
+        events: {
+          onReady: function () {
+            const slider = document.getElementById("volumeSlider");
+            player.setVolume(slider.value);
+          }
+        }
+      });
+    }
+
+    document.getElementById("volumeSlider").addEventListener("input", function () {
+      if (player && player.setVolume) {
+        player.setVolume(this.value);
+        if (this.value > 0) player.unMute();
+      }
+    });
+
+    window.onload = () => {
+      updateClock();
+      setInterval(updateClock, 1000);
+      fetchWeatherLocalAndWeek();
+      setInterval(fetchWeatherLocalAndWeek, 7200000); // 2時間ごと
+    };
+  </script>
+</body>
+</html>
